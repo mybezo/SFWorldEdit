@@ -33,6 +33,7 @@ import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitTask;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -44,15 +45,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public class CommandManager implements IManager {
     private final Map<UUID, Backup> actions = new HashMap<>();
     private final Map<String, Queue<CachedRequest>> cachedRequests = new HashMap<>();
-    private final Map<UUID, Pair<Location, Location>> selection = new HashMap<>();
+    // Read by the async particle task while commands mutate it on the main thread.
+    private final Map<UUID, Pair<Location, Location>> selection = new ConcurrentHashMap<>();
     private final List<SubCommand> commands = new ArrayList<>();
     @Nullable
     private ISFWorldEdit plugin;
+    @Nullable
+    private BukkitTask particleTask;
 
     public CommandManager(@Nonnull ISFWorldEdit plugin) {
         this.plugin = plugin;
@@ -87,7 +92,7 @@ public class CommandManager implements IManager {
         if (pair == null) {
             return null;
         }
-        return selection.get(player).getFirstValue();
+        return pair.getFirstValue();
     }
 
     @Nullable
@@ -96,7 +101,7 @@ public class CommandManager implements IManager {
         if (pair == null) {
             return null;
         }
-        return selection.get(player).getSecondValue();
+        return pair.getSecondValue();
     }
 
     public void addCachedRequest(@Nonnull CommandSender sender, @Nonnull CachedRequest request) {
@@ -123,20 +128,22 @@ public class CommandManager implements IManager {
     }
 
     public void runParticleTask() {
-        plugin.getServer().getScheduler().runTaskTimerAsynchronously(plugin, () -> {
-            for (UUID uuid : selection.keySet()) {
-                Player player = Bukkit.getPlayer(uuid);
+        final ISFWorldEdit owner = plugin;
+        this.particleTask = owner.getServer().getScheduler().runTaskTimerAsynchronously(owner, () -> {
+            for (Map.Entry<UUID, Pair<Location, Location>> entry : selection.entrySet()) {
+                Player player = Bukkit.getPlayer(entry.getKey());
                 if (player == null) {
                     continue;
                 }
 
-                Location pos1 = getPos1(uuid);
-                Location pos2 = getPos2(uuid);
+                Location pos1 = entry.getValue().getFirstValue();
+                Location pos2 = entry.getValue().getSecondValue();
                 if (pos1 == null || pos2 == null) {
-                    return;
+                    // An incomplete selection must not stop the outline of other players.
+                    continue;
                 }
 
-                plugin.getServer().getScheduler().runTaskLaterAsynchronously(plugin, () -> ParticleUtil.drawRegionOutline(plugin, Particle.WAX_OFF, 0, pos1, pos2), Slimefun.getTickerTask().getTickRate());
+                ParticleUtil.drawRegionOutline(owner, Particle.WAX_OFF, 0, pos1, pos2);
             }
         }, 0, Slimefun.getTickerTask().getTickRate());
     }
@@ -170,6 +177,10 @@ public class CommandManager implements IManager {
 
     @Override
     public void onUnload() {
+        if (particleTask != null) {
+            particleTask.cancel();
+            particleTask = null;
+        }
         for (SubCommand command : commands) {
             plugin.getCommand("sfw" + command.getKey()).setExecutor(null);
         }

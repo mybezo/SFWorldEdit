@@ -1,149 +1,154 @@
-# AGENTS.md — SFWorldEdit 操作宪章
+# AGENTS.md — SFWorldEdit Operating Charter
 
-> 本文件是 AI 编程助手与本仓库开发者的**操作契约**。所有改动（代码、构建、文档）均须遵守本文约定；当本文与代码冲突时，以代码现状为准并同步修订本文。
+> This file is the **working contract** between AI coding assistants and the developers of this repository. Every change (code, build, docs) must follow it. When this file and the code disagree, the code wins and this file must be updated to match.
 
-## TL;DR（太长了不看）
+## TL;DR
 
-1. 本仓库是 **Paper/Spigot + Slimefun4 附属插件**（Gradle Kotlin DSL、Java 21 编译、Java ≥ 17 运行），默认分支 `main`；改动必须通过 `./gradlew clean build` 后才能提交。
-2. 玩家可见文案一律走 `lang/*.yml` + `LocalizationService`；日志一律走 `Debug.*`；**禁止** `System.out.println`、**禁止**改动 `SFW_WORLDEDITOR` 等 Slimefun ID、**禁止** `git push -f`、**禁止**绕过构建失败（`-x test` / `--offline`）。
-3. 依赖只在 `gradle/libs.versions.toml` 声明；`MetaLib` / `DisplayModelLib` 因源仓库下线由 `lib/*.jar` 提供，不要删。
-4. 提交权归开发者本人；助手只把工作区留到可验收状态，不提交、不推送、不改写 git 历史。
+1. This is a **Paper/Spigot + Slimefun4 addon** (Gradle Kotlin DSL, compiled with Java 21, runs on Java ≥ 17). The default branch is `main`. A change must pass `./gradlew clean build` before it is committed.
+2. Player-facing text always goes through `lang/*.yml` + `LocalizationService`; logging always goes through `Debug.*`. **Never** use `System.out.println`, **never** change Slimefun IDs such as `SFW_WORLDEDITOR`, **never** `git push -f`, **never** bypass a failing build (`-x test` / `--offline`).
+3. Dependencies are declared only in `gradle/libs.versions.toml`. `MetaLib` / `DisplayModelLib` come from `lib/*.jar` because their source repository is offline; do not delete them.
+4. Committing is the developer's call. The assistant leaves the working tree in a reviewable state and does not commit, push, or rewrite git history.
 
 ---
 
-## 1. 项目身份与边界
+## 1. Project identity and scope
 
-| 维度 | 事实 |
+| Aspect | Fact |
 | --- | --- |
-| 定位 | 面向 Slimefun 方块与 BlockData 的**区域编辑器**：选区、批量放置/克隆/清空、BlockMenu 槽位读写、撤销、YAML 投影与 Display 实体预览 |
-| 入口类 | `com.balugaq.sfworldedit.implementation.SFWorldedit` → `extends ISFWorldEdit implements Listener`；`ISFWorldEdit extends JavaPlugin implements SlimefunAddon` |
-| 插件名 | `SFWorldEdit`（`plugin.yml`），`api-version: 1.20`，`depend: [Slimefun]`，`softdepend: [GuizhanLibPlugin]` |
-| 坐标 | group `com.balugaq.sfworldedit`，version 由 `gradle.properties` 的 `version=` 提供（当前 51） |
-| 版本目标 | 源码最低 Java 16（record / `Stream.toList()` / 文本块 / 模式匹配）；运行时门禁 Java ≥ 17；编译与 CI 用 Java 21；兼容矩阵 `1.20.1`、`26.2` |
-| 仓库 | `github.com/balugaq/SFWorldEdit`，默认分支 `main` |
-| AI 职责 | 功能代码、Bug 修复、构建/CI 维护、文档维护 |
-| AI 不负责 | 发布版本、推送远端、改写 git 历史 |
+| Purpose | A **region editor** for Slimefun blocks and BlockData: selection, bulk place/clone/clear, BlockMenu slot read/write, undo, YAML save/load and display-entity previews |
+| Main class | `com.balugaq.sfworldedit.implementation.SFWorldedit` → `extends ISFWorldEdit implements Listener`; `ISFWorldEdit extends JavaPlugin implements SlimefunAddon` |
+| Plugin name | `SFWorldEdit` (`plugin.yml`), `api-version: 1.20`, `depend: [Slimefun]`, `softdepend: [GuizhanLibPlugin]` |
+| Coordinates | group `com.balugaq.sfworldedit`; the version comes from `version=` in `gradle.properties` (currently 51) |
+| Version targets | Source needs at least Java 16 (records / `Stream.toList()` / text blocks / pattern matching); runtime gate Java ≥ 17; compile and CI use Java 21; compatibility matrix `1.20.1`, `26.2` |
+| Repository | `github.com/balugaq/SFWorldEdit`, default branch `main` |
+| AI responsibilities | Feature code, bug fixes, build/CI maintenance, documentation |
+| Not the AI's job | Releasing versions, pushing to the remote, rewriting git history |
 
 ---
 
-## 2. 包地图（改代码前先定位）
+## 2. Package map (find the right place before editing)
 
-| 包 | 职责 | 关键类 |
+| Package | Responsibility | Key classes |
 | --- | --- | --- |
-| `api/plugin` | 插件抽象基类 | `ISFWorldEdit`（`getString` / `send` / `sendList`） |
-| `api/objects` | 命令与请求抽象 | `SubCommand`(`TabExecutor`)、`CachedRequest`、`enums.MinecraftVersion`（record）、`enums.Facing` |
-| `api/data` | 数据模型 | `Content`(抽象 + `action()`)、`BukkitContent`、`SFContent`、`ChunkData`(record)、`Backup`(撤销栈)、`Language` |
-| `core/commands` | 20 个命令实现 | `PasteCommand`、`ClearCommand`、`CloneCommand`、`SaveFileCommand`、`LoadFileCommand`、`UndoCommand` 等 |
-| `core/managers` | 生命周期管理 | `IManager`(`onLoad`/`onUnload`)、`CommandManager`、`ConfigManager`、`DisplayManager` |
-| `core/services` | 本地化 | `LocalizationService` |
-| `implementation` | 装配与 Slimefun 物品 | `SFWorldedit`、`SFWItemsSetup`、`slimefun.SFWItemGroups` / `SFWItems` / `SFWRecipes` / `items.SFWorleditor` |
-| `utils` | 工具类 | `WorldUtils`(编辑核心)、`Debug`、`Constants`、`ReflectionUtil`、`ClipboardUtil`、`YamlWriter`、`TextUtil` |
+| `api/plugin` | Plugin base class | `ISFWorldEdit` (`getString` / `send` / `sendList`) |
+| `api/objects` | Command and request abstractions | `SubCommand` (`TabExecutor`), `CachedRequest`, `enums.MinecraftVersion` (record), `enums.Facing` |
+| `api/data` | Data model | `Content` (abstract + `action()`), `BukkitContent`, `SFContent`, `ChunkData` (record), `Backup` (undo stack), `Language` |
+| `core/commands` | 20 command implementations | `PasteCommand`, `ClearCommand`, `CloneCommand`, `SaveFileCommand`, `LoadFileCommand`, `UndoCommand`, ... |
+| `core/managers` | Lifecycle managers | `IManager` (`onLoad`/`onUnload`), `CommandManager`, `ConfigManager`, `DisplayManager` |
+| `core/services` | Localization | `LocalizationService` |
+| `implementation` | Wiring and Slimefun items | `SFWorldedit`, `SFWItemsSetup`, `slimefun.SFWItemGroups` / `SFWItems` / `SFWRecipes` / `items.SFWorleditor` |
+| `utils` | Utilities | `WorldUtils` (editing core), `Debug`, `Constants`, `ReflectionUtil`, `ClipboardUtil`, `YamlWriter`, `TextUtil` |
 
-物品注册入口：`SFWItemsSetup.setup()`；工具 `SFW_WORLDEDITOR` 的 `ToolUseHandler` 左键设 pos1、`ItemUseHandler` 右键设 pos2，配方类型为 `RecipeType.NULL`。
-
----
-
-## 3. 技术栈与构建
-
-- **版本识别**：`MinecraftVersion` 采用 NetworksExpansion 的 `record (major, minor, patch)` 实现，由 `Bukkit.getMinecraftVersion()` 字符串解析，不枚举版本常量，26.x 天然可识别；约定常量为 `V1_20` / `V1_20_5` / `V1_21` / `V1_21_3` / `V1_21_4`，`UNKNOWN` = `(999,999,999)`。调用 `current()`、`isAtLeast(...)` / `isBefore(...)`、`humanize()`；判断 UNKNOWN 用 `equals(UNKNOWN)`（record 不能用 `==`）。
-- **构建**：`build.gradle.kts`（Gradle Kotlin DSL）+ `com.gradleup.shadow`；`defaultTasks("clean", "build")`；产物 `build/libs/SFWorldEdit-<version>.jar`（fat jar，relocation `org.bstats` → `com.balugaq.sfworldedit.bstats`，`minimize()`，排除 `META-INF/*`）。
-- **依赖**：全部声明在 `gradle/libs.versions.toml`，`build.gradle.kts` 只用 `libs.xxx` 引用。`compileOnly` 对应原 Maven `provided`，`implementation` 对应会被 shade 的 `compile`。
-- **version 注入**：`processResources { filesMatching("plugin.yml") { expand("version" to project.version.toString()) } }`，因此 `plugin.yml` 里必须写 `version: ${version}`。**不要改回 Maven 的 `${project.version}`**，否则 jar 内版本号是字面量，Bukkit 加载失败，且兼容性 workflow 从 jar 取版本号的检查会失效。
-- **本地 JAR**：`org.metamechanists:MetaLib:46` 与 `DisplayModelLib:3` 的原仓库 `repo.metamechanists.org` 已全站 404，改由 `implementation(fileTree("lib"))` 提供。`.gitignore` 有 `!lib/*.jar` 例外，勿删这两个文件。
-- **仓库**：`mavenCentral()`、`repo.papermc.io`、`jitpack.io`、`hub.spigotmc.org`。`net.guizhanss:GuizhanLibPlugin` 在 **Maven Central**，不需要额外仓库。
-- **CI**：`.github/workflows/build.yml`（JDK 21，`./gradlew test` + `clean build`）、`release.yml`（`gradle.properties` 版本变更自动发 Release）、`test-compatibility.yml`（矩阵 `1.20.1,26.2`，预装 JDK 21/25，按 Paper API 的 `java.version.minimum` 切换）。提交信息以 `[ci skip]` 开头可跳过 build。
-- **Dependabot**：`yearly`（GitHub Docs 标注该值仅 GHES 3.19+ 明确支持；若 github.com 不识别，等价写法为 `cron` + `cronjob: "0 0 1 1 *"`）。
+Items are registered in `SFWItemsSetup.setup()`. The `SFW_WORLDEDITOR` wand sets pos1 on left click (`ToolUseHandler`) and pos2 on right click (`ItemUseHandler`); its recipe type is `RecipeType.NULL`.
 
 ---
 
-## 4. 启动顺序（不可打乱）
+## 3. Tech stack and build
 
-`SFWorldedit.onEnable()`：
+- **Version detection**: `MinecraftVersion` uses the `record (major, minor, patch)` implementation from NetworksExpansion. It parses the `Bukkit.getMinecraftVersion()` string instead of enumerating constants, so 26.x is recognized out of the box. Conventional constants are `V1_20` / `V1_20_5` / `V1_21` / `V1_21_3` / `V1_21_4`; `UNKNOWN` = `(999,999,999)`. Use `current()`, `isAtLeast(...)` / `isBefore(...)`, `humanize()`; compare with UNKNOWN using `equals(UNKNOWN)` (records must not be compared with `==`).
+- **Build**: `build.gradle.kts` (Gradle Kotlin DSL) + `com.gradleup.shadow`; `defaultTasks("clean", "build")`. Output is `build/libs/SFWorldEdit-<version>.jar` (fat jar, relocation `org.bstats` → `com.balugaq.sfworldedit.bstats`, `minimize()`, `META-INF/*` excluded).
+- **Dependencies**: all declared in `gradle/libs.versions.toml`; `build.gradle.kts` only references `libs.xxx`. `compileOnly` replaces Maven's `provided`, `implementation` replaces the shaded `compile`.
+- **Version injection**: `processResources { filesMatching("plugin.yml") { expand("version" to project.version.toString()) } }`, so `plugin.yml` must contain `version: ${version}`. **Do not change it back to Maven's `${project.version}`**: the jar would contain the literal string, Bukkit would fail to load it, and the compatibility workflow (which reads the version from the jar) would break.
+- **Local JARs**: the repository of `org.metamechanists:MetaLib:46` and `DisplayModelLib:3` (`repo.metamechanists.org`) returns 404 for everything, so both come from `implementation(fileTree("lib"))`. `.gitignore` has a `!lib/*.jar` exception; do not delete these files.
+- **Repositories**: `mavenCentral()`, `repo.papermc.io`, `jitpack.io`, `hub.spigotmc.org`. `net.guizhanss:GuizhanLibPlugin` is on **Maven Central** and needs no extra repository.
+- **CI**: `.github/workflows/build.yml` (JDK 21, `./gradlew test` + `clean build`), `release.yml` (publishes a Release when the version in `gradle.properties` changes), `test-compatibility.yml` (matrix `1.20.1,26.2`, JDK 21/25 preinstalled, chosen from Paper API's `java.version.minimum`). Start a commit message with `[ci skip]` to skip the build.
+- **Dependabot**: Gradle ecosystem, `monthly`.
+- **gradlew** must keep its executable bit (`100755`); the workflows also `chmod +x` it defensively.
+
+---
+
+## 4. Startup order (do not reorder)
+
+`SFWorldedit.onEnable()`:
 
 1. `Preconditions.checkArgument(instance == null)` → `instance = this`
 2. `saveDefaultConfig()` → `new ConfigManager(this)` → `configManager.onLoad()`
-3. `new LocalizationService(this)` → `addLanguage(configManager.getLanguage())` → `addLanguage(DEFAULT_LANGUAGE="zh-CN")`
-4. `environmentCheck()`：`MinecraftVersion.current()` 解析 `Bukkit.getMinecraftVersion()`；MC 低于 1.16 或 `javaVersion < 17` → `disablePlugin(this)` 并 `return`；解析异常降级为 `UNKNOWN` 后只告警（`UNKNOWN` 被定义为最大版本，不阻止启动）
-5. `tryUpdate()`：`configManager.isAutoUpdate()` 且 `getDescription().getVersion().startsWith("Build")` 时才调用 `GuizhanUpdater.start(...)`（当前版本 `51` 不触发）
-6. `SFWItemsSetup.setup(this)` —— 会触发 `Constants` 静态初始化，依赖 `getInstance()` 与 localizationService 已就绪
+3. `new LocalizationService(this)` → `addLanguage(configManager.getLanguage())` (skipped when it equals the default) → `addLanguage(DEFAULT_LANGUAGE="en-US")`
+4. `environmentCheck()`: `MinecraftVersion.current()` parses `Bukkit.getMinecraftVersion()`; MC below 1.16 or `javaVersion < 17` → `disablePlugin(this)` and `return`; a parse error falls back to `UNKNOWN` and only warns (`UNKNOWN` is defined as the highest version and does not block startup)
+5. `tryUpdate()`: calls `GuizhanUpdater.start(...)` only when `configManager.isAutoUpdate()` and `getDescription().getVersion().startsWith("Build")` (version `51` does not trigger it)
+6. `SFWItemsSetup.setup(this)` — triggers static initialization of `Constants`, which needs `getInstance()` and the localization service
 7. `new CommandManager(this)` → `onLoad()` → `registerCommands()`
 8. `new DisplayManager(this)` → `onLoad()`
 9. `Debug.info(getString("messages.startup.done"))`
 
-`onDisable()`：`SlimefunItemUtil.unregisterAllItems()` → `displayManager.onUnload()` → `commandManager.onUnload()` → **先取告别语文案** → `localizationService = null` → 清理版本字段 → `configManager.onUnload()` → `Debug.info(message)` → `instance = null`。`Debug.*` 依赖 `getInstance()`，告别日志必须在 `instance = null` 之前打印。
+`onDisable()`: `SlimefunItemUtil.unregisterAllItems()` → `displayManager.onUnload()` → `commandManager.onUnload()` (also cancels the particle task) → **fetch the goodbye message first** → `localizationService = null` → clear version fields → `configManager.onUnload()` → `Debug.info(message)` → `instance = null`. `Debug.*` depends on `getInstance()`, so the goodbye log must be printed before `instance = null`.
 
 ---
 
-## 5. 决策树：当遇到 A 时，执行 B
+## 5. Decision tree: when you hit A, do B
 
-### 5.1 新增 / 修改命令
+### 5.1 Adding or changing a command
 
-- 新建 `SubCommand` 子类放在 `core/commands/`，`getKey()` 返回与 `plugin.yml` 中 `sfw<key>` 对应的 key。
-- 在 `CommandManager.onLoad()` 注册；若需按配置开关（如 `UndoCommand` 仅在 `allow-undo: true` 时注册），照现有条件分支写。
-- 在 `plugin.yml` 补命令、别名（带前导 `/`）、权限节点 `sfworldedit.command.<key>`。
-- **注意**：`SaveFileCommand` / `LoadFileCommand` 的 KEY 是 `saveFile` / `loadFile`（含大写 F），而 `plugin.yml` 声明为全小写；`PermissionUtil` 用 `key.toLowerCase()` 拼权限，别"顺手统一大小写"。
+- Create a `SubCommand` subclass in `core/commands/`; `getKey()` returns the key matching `sfw<key>` in `plugin.yml`.
+- Register it in `CommandManager.onLoad()`. If it depends on a config switch (e.g. `UndoCommand` is only registered when `allow-undo: true`), follow the existing conditional.
+- Add the command, its alias (with a leading `/`) and the permission node `sfworldedit.command.<key>` to `plugin.yml`.
+- Add a `messages.command.help.usage.<key>` entry to both language files; `HelpCommand` matches keys case-insensitively.
+- **Note**: the KEYs of `SaveFileCommand` / `LoadFileCommand` are `saveFile` / `loadFile` (capital F), while `plugin.yml` declares them in lower case. `PermissionUtil` builds the permission with `key.toLowerCase()`; do not "tidy up" the casing.
+- Bukkit always passes at least one (possibly empty) argument to `onTabComplete`; never branch on `args.length == 0`.
 
-### 5.2 文案与语言文件
+### 5.2 Messages and language files
 
-- 玩家可见文案写入 `src/main/resources/lang/zh-CN.yml` 与 `en-US.yml`，通过 `LocalizationService` 取。**禁止**在 Java 里硬编码中文（现状仅 `ClipboardUtil` 有 2 处，属历史债务）。
-- `send()` / `sendMessage()` / `sendList()` 会**自动加 `messages.` 前缀**，调用方写相对键（如 `"error.no-permission"`）；`getString(path)` **不加前缀**，调用方必须写全路径（如 `"messages.startup.done"`）。
-- 占位符是 `MessageFormat` 的 `{0}` / `{1}`，颜色用 `&a` 等 `ChatColor` 码；`${...}` 是 Gradle 占位符，只应出现在 `plugin.yml`。
-- `Language` 加载时会把 jar 内默认配置的缺失键**补写**进用户文件，但不会覆盖已有值；新增键要同时改两份语言文件。
+- Player-facing text goes into **both** `src/main/resources/lang/en-US.yml` and `zh-CN.yml` and is read through `LocalizationService`. **Never** hard-code text in Java.
+- `send()` / `sendMessage()` **automatically prepend `messages.`**, so callers pass relative keys (e.g. `"error.no-permission"`). `getString(path)` and `sendList(...)` do **not** add a prefix; callers pass the full path (e.g. `"messages.startup.done"`).
+- Placeholders are `MessageFormat` style `{0}` / `{1}`; colors use `ChatColor` codes like `&a`. `${...}` is a Gradle placeholder and belongs only in `plugin.yml`.
+- On load, `Language` **adds** keys missing from the user's file using the jar defaults but never overwrites existing values. Both language files must keep the same key set.
 
-### 5.3 配置
+### 5.3 Configuration
 
-- 新配置项加进 `src/main/resources/config.yml` 并在 `ConfigManager` 加带默认值的 getter（如 `getInt(path, default)`）；**禁止**在业务代码里散落 `getConfig().getXxx(...)` 魔法字符串。
-- `ConfigManager.setupDefaultConfig()` 只补缺失键、不覆盖已有值；`config-version` 目前只写不读。
-- `RuleCommand` 通过 `setConfig(path, value)` 热改限额，改动需保持其整数校验。
+- Add new options to `src/main/resources/config.yml` and a getter with a default in `ConfigManager` (e.g. `getInt(path, default)`). **Never** scatter `getConfig().getXxx(...)` magic strings in business code.
+- Numeric limits are clamped to at least 1 in `ConfigManager`; `RuleCommand` (`setConfig(path, value)`) rejects values below 1. Keep both guards: a chunk limit of 0 would divide by zero in `WorldUtils`.
+- `ConfigManager.setupDefaultConfig()` only adds missing keys and never overwrites values; `config-version` is currently written but never read.
 
-### 5.4 日志与异常
+### 5.4 Logging and exceptions
 
-- 常规日志一律 `Debug.info/warning/severe`（底层走 `SFWorldedit.getInstance().getLogger()`）。
-- 调试输出用 `Debug.debug(...)`，受 `config.yml` 的 `debug` 开关控制。
-- 异常用 `Debug.trace(e)`；现状有 9 处裸 `e.printStackTrace()`，属于待收敛的历史债务，新增代码不得沿用。
-- `Debug.*` 依赖静态 `instance`，不要在插件未启用 / 已禁用后调用。
+- Regular logging always uses `Debug.info/warning/severe` (backed by `SFWorldedit.getInstance().getLogger()`).
+- Debug output uses `Debug.debug(...)`, controlled by the `debug` switch in `config.yml`.
+- Exceptions use `Debug.trace(e)` (logs through the plugin logger). Four bare `e.printStackTrace()` calls remain in `ReflectionUtil` / `YamlWriter`; new code must not add more.
+- `Debug.*` depends on the static `instance`; do not call it before the plugin is enabled or after it is disabled.
 
-### 5.5 世界编辑核心
+### 5.5 World editing core
 
-- `WorldUtils.doWorldEdit()` 按 `ChunkData` 分组、按 `modification-chunk-limit-per-second` 分批 `runTaskLater`、按 `allow-undo` 收集 `Content` 备份；修改分批逻辑时先读懂这三段。
-- 访问已注册 Slimefun 方块的持久化数据走 `StorageCacheUtils` / `SlimefunBlockData`，不要绕过存储层。
-- `WorldUtils` 静态块通过 `ReflectionUtil` 按名反射 `CraftBlockState` 的 `data` / `position` / `world` / `weakWorld` 私有字段，并有 `success` 标志兜底。这是**运行时对 CraftBukkit 实现细节的耦合**，改 MC 版本支持时必须验证反射是否仍命中；源码没有编译期 NMS 依赖。
-- `ClipboardUtil` 用 `player.spigot().sendMessage(...)`（BungeeChat），未使用 Adventure；换 API 时留意。
-- 投影实体用 `org.bukkit.entity.Display` / `BlockDisplay`（1.19.4+）。
+- `WorldUtils.doWorldEdit()` groups by `ChunkData`, batches with `runTaskLater` according to `modification-chunk-limit-per-second`, and collects `Content` backups when `allow-undo` is on. Understand all three parts before changing the batching.
+- Access persisted data of registered Slimefun blocks through `StorageCacheUtils` / `SlimefunBlockData`; never bypass the storage layer.
+- The static block of `WorldUtils` uses `ReflectionUtil` to reach the private `data` / `position` / `world` / `weakWorld` fields of `CraftBlockState` by name, with a `success` flag as a fallback. This is a **runtime coupling to CraftBukkit internals**: when adding support for a new MC version, verify the reflection still resolves. There is no compile-time NMS dependency.
+- `LoadFileCommand.deserializeContent` temporarily changes the block at the saved location to build a `BlockState` and restores the original state in a `finally` block. Keep that restore.
+- `CommandManager.selection` is read by an async particle task; keep it a `ConcurrentHashMap`.
+- `ClipboardUtil` uses `player.spigot().sendMessage(...)` (BungeeChat), not Adventure; keep that in mind when switching APIs.
+- Preview entities use `org.bukkit.entity.Display` / `BlockDisplay` (1.19.4+).
 
-### 5.6 依赖与构建
+### 5.6 Dependencies and build
 
-- 新增依赖：先确认坐标可解析（POM/metadata 返回 200），再加进 `libs.versions.toml`，`build.gradle.kts` 用 `libs.xxx` 引用，跑 `./gradlew clean build`。
-- 升级第三方库前用 `javap` 核对实际调用的 API 签名（已有先例：`GuizhanUpdater.start(Plugin, File, String, String, String)` 在 1.7.6 与 2.5.0 一致）。
-- 区分 `compileOnly`（服务端提供）与 `implementation`（要打进 jar）。`bstats` 目前源码零引用、shade 后被 `minimize()` 剔除，可安全移除但不要擅自改。
-- 构建失败时先读报错定位依赖/编译/shadow 冲突，**禁止** `-x test` / `--offline` 硬跳过。
-
----
-
-## 6. 验收
-
-1. `./gradlew clean build` 通过；产物在 `build/libs/`。
-2. 检查 jar 内 `plugin.yml` 的 `version` 是真实版本号，不是 `${...}`。
-3. CI 的兼容性测试（`1.20.1` 与 `26.2`）日志中出现 `Enabling SFWorldEdit`，且 `Disabling` 不出现在 `Done (` 之前。
-4. `git status --short` 无意外改动；不提交、不推送。
-5. 样式 / 视觉类改动由开发者目视确认，助手不得自行启动浏览器或渲染工具做验证。
+- New dependency: first confirm the coordinates resolve (POM/metadata returns 200), then add it to `libs.versions.toml`, reference it as `libs.xxx` in `build.gradle.kts`, and run `./gradlew clean build`.
+- Before upgrading a third-party library, check the signatures you actually call with `javap` (precedent: `GuizhanUpdater.start(Plugin, File, String, String, String)` is identical in 1.7.6 and 2.5.0).
+- Distinguish `compileOnly` (provided by the server) from `implementation` (shaded into the jar). `bstats` has no source references and is removed by `minimize()` after shading; it can be dropped safely, but do not do so unasked.
+- When the build fails, read the error and locate the dependency / compile / shadow conflict. **Never** skip with `-x test` / `--offline`.
 
 ---
 
-## 7. 红线
+## 6. Acceptance
 
-- 不改 Slimefun 物品 ID（尤其 `SFW_WORLDEDITOR`）与 `plugin.yml` 的 `depend` / `api-version`，除非开发者明确要求。
-- 不用 `System.out.println` 输出日志；不吞异常。
-- 不擅自改 `onEnable` / `onDisable` 的初始化与销毁顺序。
-- 不删 `lib/*.jar`、不删 Gradle wrapper、不把本机 `org.gradle.java.home` 写进 `gradle.properties`。
-- 不提交、不推送、不 `git push -f`、不改写 git 历史。
+1. `./gradlew clean build` passes; the output is in `build/libs/`.
+2. `plugin.yml` inside the jar has a real `version`, not `${...}`.
+3. The CI compatibility tests (`1.20.1` and `26.2`) log `Enabling SFWorldEdit`, and `Disabling` does not appear before `Done (`.
+4. `git status --short` shows no unexpected changes; nothing is committed or pushed.
+5. Visual / style changes are confirmed by the developer; the assistant must not launch a browser or rendering tool to verify them.
 
 ---
 
-## 8. 已知债务（改动时留意，不要当成"笔误"顺手改）
+## 7. Red lines
 
-- `SFWorldedit` 构造器的自动更新 `branch = "master"`，而仓库默认分支是 `main`；当前版本号 `51` 不以 `Build` 开头，`tryUpdate()` 不会触发，暂无害。
-- 若干本地化 key 在两份 lang 中都不存在（如 `messages.save-all`、`commands.clearprojectile.success`、`error.file-not-found`），会触发 `severe("No localization found for path: ...")` 并原样返回路径。
-- `zh-CN.yml` 与 `en-US.yml` 不同步：中文版多出 `//srule`、`//sundo`、`//sconfirm` 等帮助行与若干 error 键；`-skipvanilla` 的短参数一个是 `-v` 一个是 `-s`。
-- `bstats` 依赖源码零引用；`MetaLib` 无直接 import（作为 DisplayModelLib 的传递依赖被打进 jar）。
-- `e.printStackTrace()` 尚存 9 处；Java 源码硬编码中文 2 处（`ClipboardUtil`）。
+- Do not change Slimefun item IDs (especially `SFW_WORLDEDITOR`) or `depend` / `api-version` in `plugin.yml` unless the developer explicitly asks.
+- Do not log with `System.out.println`; do not swallow exceptions.
+- Do not reorder initialization and teardown in `onEnable` / `onDisable` on your own.
+- Do not delete `lib/*.jar` or the Gradle wrapper, and do not write a local `org.gradle.java.home` into `gradle.properties`.
+- Do not commit, push, `git push -f` or rewrite git history.
+
+---
+
+## 8. Known debt (be aware of it, do not "fix it in passing")
+
+- The auto-update `branch` in the `SFWorldedit` constructor is `"master"` while the default branch is `main`. Version `51` does not start with `Build`, so `tryUpdate()` never runs; harmless for now.
+- `bstats` has no source references; `MetaLib` has no direct import (it is shaded as a transitive dependency of DisplayModelLib).
+- Four `e.printStackTrace()` calls remain (`ReflectionUtil` ×3, `YamlWriter` ×1).
+- `WorldUtils.ALLOW_UNDO` and `Backup.MAX_BACKUP_SIZE` are read once in static initializers, so changing `allow-undo` / `max-backups` needs a server restart, not just `//sreload`.
+- `ConfigManager.saveAll()` is unused.

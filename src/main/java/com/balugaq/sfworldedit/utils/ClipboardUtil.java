@@ -1,5 +1,6 @@
 package com.balugaq.sfworldedit.utils;
 
+import com.balugaq.sfworldedit.implementation.SFWorldedit;
 import lombok.experimental.UtilityClass;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.ClickEvent;
@@ -13,11 +14,11 @@ import javax.annotation.Nonnull;
 @UtilityClass
 public class ClipboardUtil {
     public static void send(@Nonnull Player player, String text) {
-        send(player, "SFWorldEdit 报告", text);
+        send(player, SFWorldedit.getInstance().getString("messages.clipboard.title"), text);
     }
 
     public static void send(@Nonnull Player player, String display, String text) {
-        send(player, display, "点击复制到剪贴板", text);
+        send(player, display, SFWorldedit.getInstance().getString("messages.clipboard.hover"), text);
     }
 
     public static void send(@Nonnull Player player, String display, String hover, String text) {

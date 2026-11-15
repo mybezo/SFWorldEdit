@@ -1,7 +1,7 @@
 name: Test Plugin Compatibility
 
 env:
-  # 默认测试版本（push/PR 触发时用这套；手动触发可覆盖）
+  # Default versions to test (used on push/PR; can be overridden on manual dispatch)
   DEFAULT_VERSIONS: '1.20.1,26.2'
 
 on:
@@ -11,12 +11,12 @@ on:
   workflow_dispatch:
     inputs:
       versions:
-        description: '要测试的 MC 版本，逗号分隔（留空用默认列表）'
+        description: 'Comma-separated MC versions to test (leave empty for the default list)'
         required: false
         default: '1.20.1,26.2'
 
 jobs:
-  # 把版本串拆成矩阵：手动触发用输入值，push/PR 用默认列表
+  # Split the version string into a matrix: manual runs use the input, push/PR use the default list
   prepare:
     runs-on: ubuntu-latest
     outputs:
@@ -27,7 +27,7 @@ jobs:
         run: |
           RAW="${{ github.event.inputs.versions }}"
           [ -z "$RAW" ] && RAW="$DEFAULT_VERSIONS"
-          # 去空格、按逗号拆分成 JSON 数组
+          # Strip spaces and split on commas into a JSON array
           VERSIONS=$(echo "$RAW" | tr -d ' ' | tr ',' '\n' | jq -R . | jq -sc .)
           echo "Test versions: $VERSIONS"
           echo "versions=$VERSIONS" >> $GITHUB_OUTPUT
@@ -47,13 +47,13 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          # 21 跑旧版本；26.x 起的 Paper 要求 Java 25
+          # 21 for older versions; Paper 26.x and later requires Java 25
           java-version: |
             21
             25
           cache: gradle
 
-      # gradlew 在 git 里可能是 100644（Windows 提交时丢执行位），runner 上直接 ./gradlew 会 126
+      # gradlew may be stored as 100644 in git (exec bit lost on Windows commits); ./gradlew would exit 126
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
@@ -61,13 +61,13 @@ jobs:
         run: |
           ./gradlew clean build -x test
 
-          # 版本号从 Gradle 工程取（plugin.yml 里是 ${version} 占位符，最终值由 Gradle 注入）
+          # Read the version from the Gradle project (plugin.yml holds a ${version} placeholder filled in by Gradle)
           PROPS=$(./gradlew -q properties)
           PLUGIN_VERSION=$(echo "$PROPS" | grep -oP '^version: \K.*' | head -n 1)
           echo "Gradle project version: $PLUGIN_VERSION"
           echo "PLUGIN_VERSION=$PLUGIN_VERSION" >> $GITHUB_ENV
 
-      # 缓存 Paper 服务端本体（jar + 原版库 + 补丁产物），按版本区分，避免每次重下 40M+ 和重解压
+      # Cache the Paper server (jar + vanilla libraries + patched output) per version to avoid re-downloading 40 MB+ every run
       - name: Cache Paper server
         uses: actions/cache@v4
         with:
@@ -83,9 +83,9 @@ jobs:
         run: |
           mkdir -p server/plugins
 
-          # 依赖插件
-          # SFWorldEdit 的 plugin.yml 里 depend: [Slimefun]，不装 Slimefun 会被 Bukkit 拒绝启用
-          # 用 GuguProject 构建源（与仓库编译目标对齐）
+          # Dependency plugins
+          # SFWorldEdit declares depend: [Slimefun]; Bukkit refuses to enable it without Slimefun
+          # Use the SlimefunGuguProject build (matches the compile target of this repository)
           curl -L -o server/plugins/Slimefun4.jar \
             "https://resources.guizhanss.com/api/v1/projects/Slimefun4/versions/master-271/download"
 
@@ -99,7 +99,7 @@ jobs:
 
           VER="${{ matrix.version }}"
 
-          # 先校验版本真实存在；不存在则列出 Did you mean 候选并跳过测试（不算失败）
+          # Check that the version exists first; if not, list "Did you mean" candidates and skip (not a failure)
           export VER
           RESOLVE=$(python3 << 'EOF' 2>&1
           import json, os, urllib.request
@@ -118,12 +118,12 @@ jobs:
 
           if ver in ids:
               print('EXISTS')
-              # 从版本信息里取最低 Java 要求，供后续选择 JDK
+              # Read the minimum Java version so the right JDK can be selected later
               entry = next(v for v in items if v['version']['id'] == ver)
               minimum = entry['version'].get('java', {}).get('version', {}).get('minimum', 21)
               print(f'MINJAVA={minimum}')
           else:
-              # 前缀匹配：输入 26.1 → 提示 26.1.1 / 26.1.2
+              # Prefix match: input 26.1 suggests 26.1.1 / 26.1.2
               near = sorted(i for i in ids if i.startswith(ver + '.'))
               if near:
                   print('SUGGEST=' + ', '.join(near))
@@ -131,30 +131,30 @@ jobs:
                   print('NO_SUGGEST')
           EOF
           ) || {
-            echo "::error::校验 Paper $VER 时出错: $RESOLVE"
+            echo "::error::Failed to check Paper $VER: $RESOLVE"
             exit 1
           }
 
           case "$RESOLVE" in
             EXISTS*)
-              : # 版本存在，继续
+              : # Version exists, continue
               ;;
             SUGGEST=*)
-              echo "::notice::Paper $VER 不存在。Did you mean: ${RESOLVE#SUGGEST=}"
+              echo "::notice::Paper $VER does not exist. Did you mean: ${RESOLVE#SUGGEST=}"
               exit 0
               ;;
             *)
-              echo "::error::Paper $VER 不存在，且没有以它开头的相近版本号，无法测试"
+              echo "::error::Paper $VER does not exist and no similar version starts with it; cannot test"
               exit 1
               ;;
           esac
 
-          # 按 API 给的最低 Java 要求选 JDK（本 workflow 预装 21 和 25）
+          # Pick the JDK from the minimum Java version reported by the API (this workflow installs 21 and 25)
           MINJAVA=$(echo "$RESOLVE" | grep -oP 'MINJAVA=\K\d+' | head -n 1)
           MINJAVA=${MINJAVA:-21}
-          echo "Paper $VER 最低 Java 要求: $MINJAVA"
+          echo "Paper $VER requires at least Java $MINJAVA"
           if [ "$MINJAVA" -gt 25 ]; then
-            echo "::error::Paper $VER 需要 Java $MINJAVA，超出当前 CI 预装范围（21/25），请在 setup-java 中补充"
+            echo "::error::Paper $VER needs Java $MINJAVA, which is not installed by this workflow (21/25); add it to setup-java"
             exit 1
           elif [ "$MINJAVA" -gt 21 ]; then
             if [ -n "$JAVA_HOME_25_X64" ]; then
@@ -162,12 +162,12 @@ jobs:
               export PATH="$JAVA_HOME/bin:$PATH"
               echo "Using Java 25 for Paper $VER: $(java -version 2>&1 | head -n 1)"
             else
-              echo "::warning::找不到 JAVA_HOME_25_X64，Paper $VER 可能无法启动"
+              echo "::warning::JAVA_HOME_25_X64 not found, Paper $VER may fail to start"
             fi
           fi
 
-          # 拉取该版本全部 build，解析出最新 build 的下载地址
-          # 用 Python 解析并带明确报错（API 异常时会返回错误对象，jq 会给出难懂的 index 报错）
+          # Fetch every build of this version and resolve the download URL of the latest one
+          # Parse with Python for clear errors (on failure the API returns an error object that jq reports cryptically)
           curl -s -H "User-Agent: SFWorldEdit-CI (github.com/balugaq/SFWorldEdit)" \
             "https://fill.papermc.io/v3/projects/paper/versions/$VER/builds" -o builds.json
           RESULT=$(python3 << 'EOF' 2>&1
@@ -177,14 +177,14 @@ jobs:
               data = json.load(f)
 
           if isinstance(data, dict):
-              raise SystemExit(f'API 返回异常对象: {json.dumps(data)[:300]}')
+              raise SystemExit(f'API returned an error object: {json.dumps(data)[:300]}')
           if not isinstance(data, list) or not data:
-              raise SystemExit('builds 列表为空')
+              raise SystemExit('The builds list is empty')
 
           latest = max(data, key=lambda b: b.get('id', 0))
           url = (latest.get('downloads') or {}).get('server:default', {}).get('url')
           if not url:
-              raise SystemExit(f"build {latest.get('id')} 没有下载地址: {json.dumps(latest)[:300]}")
+              raise SystemExit(f"build {latest.get('id')} has no download URL: {json.dumps(latest)[:300]}")
           print(f'URL={url}')
           EOF
           ) || {
@@ -195,14 +195,14 @@ jobs:
           echo "Downloading Paper $VER: $DOWNLOAD_URL"
           curl -L -o server/paper.jar "$DOWNLOAD_URL"
 
-          # 接受 EULA，静默启动配置
+          # Accept the EULA and write a minimal server configuration
           echo "eula=true" > server/eula.txt
           echo "online-mode=false" > server/server.properties
           echo "level-type=flat" >> server/server.properties
           echo "generate-structures=false" >> server/server.properties
 
-          # 启动服务端；后台监视进程盯 console.log，出现 "Done ("（开服完成）后发 stop 正常关服；
-          # 外层 timeout 600 兜底（paperclip 首次启动要解压原版 jar + 装库，较慢）
+          # Start the server; a background watcher sends "stop" once console.log shows "Done (" (startup finished).
+          # The outer timeout 600 is a safety net (the first paperclip start unpacks the vanilla jar and libraries, which is slow)
           cd server
           rm -f in.fifo
           mkfifo in.fifo
@@ -213,7 +213,7 @@ jobs:
           rm -f in.fifo
           cd ..
 
-          # 服务端控制台日志全量打到 job 日志，方便直接在页面看
+          # Print the whole server console log into the job log for easy reading
           echo "======== server console.log ========"
           cat server/console.log || true
           echo "======== end of console.log ========"
@@ -230,35 +230,35 @@ jobs:
         run: |
           LOG_FILE=server/console.log
           if [ ! -f "$LOG_FILE" ]; then
-            echo "::error::没有找到日志文件，服务端可能根本没启动"
+            echo "::error::Log file not found; the server probably never started"
             exit 1
           fi
 
-          # 插件名/版本从构建产物 jar 内的 plugin.yml 取，避免工程名与 Bukkit 插件名不一致时取错；
-          # plugin.yml 的 ${version} 占位符在 processResources 阶段已被 Gradle 版本号替换
+          # Read the plugin name/version from plugin.yml inside the built jar, in case the project name differs from the Bukkit plugin name;
+          # the ${version} placeholder in plugin.yml was already replaced by processResources
           JAR=$(ls build/libs/*.jar | head -n 1)
           PLUGIN_NAME=$(unzip -p "$JAR" plugin.yml | grep -oP '^name: *\K.*' | head -n 1)
           PLUGIN_VERSION=$(unzip -p "$JAR" plugin.yml | grep -oP '^version: *\K.*' | head -n 1)
           echo "Testing plugin: $PLUGIN_NAME v$PLUGIN_VERSION"
 
-          # 以 "Done (x.xxs)!" 为界：插件在 Done 之前被 Disabling = 开服阶段就炸了，判失败
+          # Use "Done (x.xxs)!" as the boundary: a Disabling line before Done means the plugin failed during startup
           DONE_LINE=$(grep -n 'Done (' "$LOG_FILE" | head -n 1 | cut -d: -f1)
           if [ -z "$DONE_LINE" ]; then
-            echo "::error::服务端在 MC ${{ matrix.version }} 上没能完成启动（未找到 Done 行）"
+            echo "::error::The server did not finish starting on MC ${{ matrix.version }} (no Done line)"
             exit 1
           fi
 
           DISABLE_LINE=$(grep -n "\[${PLUGIN_NAME}\] Disabling ${PLUGIN_NAME}" "$LOG_FILE" | head -n 1 | cut -d: -f1)
           if [ -n "$DISABLE_LINE" ] && [ "$DISABLE_LINE" -lt "$DONE_LINE" ]; then
-            echo "::error::插件在 MC ${{ matrix.version }} 上开服阶段即被禁用（Disabling 出现在 Done 之前）"
+            echo "::error::The plugin was disabled during startup on MC ${{ matrix.version }} (Disabling before Done)"
             grep -n "Disabling ${PLUGIN_NAME}" "$LOG_FILE"
             exit 1
           fi
 
-          # 没出现 Enabling 说明插件压根没加载成功（崩溃/依赖缺失）
+          # No Enabling line means the plugin never loaded (crash or missing dependency)
           if ! grep -q "Enabling ${PLUGIN_NAME}" "$LOG_FILE"; then
-            echo "::error::插件在 MC ${{ matrix.version }} 上未成功启用（未找到 Enabling 日志）"
+            echo "::error::The plugin was not enabled on MC ${{ matrix.version }} (no Enabling line)"
             exit 1
           fi
 
-          echo "✅ OK: 插件在 MC ${{ matrix.version }} 上正常启用"
+          echo "✅ OK: the plugin enabled correctly on MC ${{ matrix.version }}"

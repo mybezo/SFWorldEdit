@@ -57,7 +57,7 @@ public class BlockMenuSlotSetCommand extends SubCommand {
         final long range = WorldUtils.getRange(pos1, pos2);
         final long max = plugin.getConfigManager().getModificationBlockLimit();
         if (range > max) {
-            plugin.send(commandSender, "error.too-many-blocks", range, max);
+            plugin.send(commandSender, "error.too-many-blocks", max, range);
             return false;
         }
 

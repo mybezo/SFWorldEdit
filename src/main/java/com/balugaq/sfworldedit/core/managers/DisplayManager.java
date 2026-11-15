@@ -42,10 +42,11 @@ public class DisplayManager implements IManager {
     }
 
     public void halt0() {
-        running = false;
+        // killDisplays0 is a no-op once running is false, so remove the displays first.
         for (UUID uuid : new HashSet<>(displays.keySet())) {
-            killDisplays(uuid);
+            killDisplays0(uuid);
         }
+        running = false;
     }
 
     public void killDisplays0(UUID uuid) {

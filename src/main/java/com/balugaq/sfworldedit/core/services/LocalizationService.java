@@ -39,7 +39,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class LocalizationService {
-    private static final Map<String, String> CACHE = new HashMap<>();
+    // Per instance, so a reload or a language change never serves stale strings.
+    private final Map<String, String> cache = new HashMap<>();
     private static final String KEY_NAME = ".name";
     private static final String KEY_LORE = ".lore";
     private static final String MSG_KEY_NULL = "key cannot be null";
@@ -133,6 +134,7 @@ public class LocalizationService {
         }
 
         this.languages.add(langFilename);
+        this.cache.clear();
         final InputStreamReader defaultReader = new InputStreamReader(this.plugin.getResource(resourcePath), StandardCharsets.UTF_8);
         final FileConfiguration defaultConfig = YamlConfiguration.loadConfiguration(defaultReader);
         this.langMap.put(langFilename, new Language(langFilename, langFile, defaultConfig));
@@ -153,7 +155,7 @@ public class LocalizationService {
     @Nonnull
     public String getString0(@Nonnull String path) {
         Preconditions.checkArgument(path != null, "path cannot be null");
-        final String cached = CACHE.get(path);
+        final String cached = cache.get(path);
         if (cached != null) {
             return cached;
         }
@@ -171,7 +173,7 @@ public class LocalizationService {
             localization = this.langMap.get(lang).getLang().getString(path);
         } while (localization == null);
 
-        CACHE.put(path, localization);
+        cache.put(path, localization);
         return localization;
     }
 
@@ -191,10 +193,8 @@ public class LocalizationService {
             localization = this.langMap.get(lang).getLang().getStringList(path);
         } while (localization.isEmpty());
 
-        for (int i = 0; i < localization.size(); i++) {
-            localization.set(i, color(localization.get(i)));
-        }
-        return localization;
+        // Copy instead of coloring the list owned by the loaded configuration in place.
+        return color(localization);
     }
 
     @Nonnull

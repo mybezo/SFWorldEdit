@@ -63,7 +63,7 @@ public class ClearCommand extends SubCommand {
         final long range = WorldUtils.getRange(pos1, pos2);
         final long max = plugin.getConfigManager().getModificationBlockLimit();
         if (range > max) {
-            plugin.send(commandSender, "error.too-many-blocks", range, max);
+            plugin.send(commandSender, "error.too-many-blocks", max, range);
             return false;
         }
 
@@ -81,7 +81,8 @@ public class ClearCommand extends SubCommand {
         WorldUtils.doWorldEdit(player, pos1, pos2, (location -> {
             final Block targetBlock = pos1.getWorld().getBlockAt(location);
             if (!skipSlimefun) {
-                if (StorageCacheUtils.hasBlock(location)) {
+                final boolean wasSlimefunBlock = StorageCacheUtils.hasBlock(location);
+                if (wasSlimefunBlock) {
                     if (callHandler) {
                         SlimefunItem item = StorageCacheUtils.getSfItem(location);
                         if (item != null) {
@@ -92,9 +93,15 @@ public class ClearCommand extends SubCommand {
                             ));
                         }
                     }
-                    targetBlock.setType(Material.AIR);
+                    // -skipvanilla keeps the vanilla block and only drops the Slimefun data.
+                    if (!skipVanilla) {
+                        targetBlock.setType(Material.AIR);
+                    }
                 }
                 Slimefun.getDatabaseManager().getBlockDataController().removeBlock(location);
+                if (skipVanilla && wasSlimefunBlock) {
+                    count.addAndGet(1);
+                }
             }
             if (!skipVanilla) {
                 if (!StorageCacheUtils.hasBlock(location)) {

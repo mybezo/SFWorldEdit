@@ -26,12 +26,10 @@ messages:
         - "&b//sblockinfoadd <key> <value> &7- &e对选中区域的 Slimefun 方块增加 Slimefun 方块信息"
         - "&b//sblockinforemove <key> &7- &e对选中区域的 Slimefun 方块移除 Slimefun 方块信息"
         - "&b//sblockmenuslotset <slot> &7- &e设置选中区域的 Slimefun 方块的方块菜单槽为你手中的物品"
-        - "&b//spaste <sfid> [-override|-o] [-force|-f] [-prepare|-p] &7- &e粘贴指定的 Slimefun 方块到选中区域"
+        - "&b//spaste <sfid> [-override|-o] [-force|-f] [-withoutblock|-w] [-prepare|-p] &7- &e粘贴指定的 Slimefun 方块到选中区域"
         - "&b//sclone [-override|-o] [-prepare|-p] &7- &e将选中区域克隆到你所处的位置"
         - "&b//sclear [-callhandler|-c] [-skipvanilla|-v] [-skipslimefun|-s] &7- &e清除选中区域的方块"
         - "&b//sclearpos &7- &e清除你标记的位置"
-        - "&b//sreload &7- &e重新加载配置文件"
-        - "&b//sversion &7- &e显示插件版本"
         - "&b//srule <rule> <value> &7- &e修改配置文件"
         - "&b//sundo &7- &e撤销上一次操作"
         - "&b//sconfirm &7- &e确认操作"
@@ -73,13 +71,14 @@ messages:
           - "&bsfid: &e指定的 Slimefun 方块 ID"
           - "&b[-override|-o]: &e覆盖已有 Slimefun 方块"
           - "&b[-force|-f]: &e跳过 NotPlaceable 检查，强制粘贴指定的 Slimefun 方块"
+          - "&b[-withoutblock|-w]: &e只写入 Slimefun 数据，不改动原版方块"
           - "&b[-prepare|-p]: &e加载预制投影"
         clone:
           - "&b//sclone [-override|-o] &7- &e将选中区域克隆到你所处的位置"
           - "&b[-override|-o]: &e覆盖已有方块"
           - "&b[-prepare|-p]: &e加载预制投影"
         clear:
-          - "&b//sclear [-callhandler|-c] [-skipvanilla|-s] &7- &e清除选中区域的方块"
+          - "&b//sclear [-callhandler|-c] [-skipvanilla|-v] [-skipslimefun|-s] &7- &e清除选中区域的方块"
           - "&b[-callhandler|-c]: &e调用粘液方块的 onPlayerBreak 方法"
           - "&b[-skipvanilla|-v]: &e跳过原版方块"
           - "&b[-skipslimefun|-s]: &e跳过 Slimefun 方块"
@@ -122,7 +121,7 @@ messages:
       success: "&a对 &e{0} &a个方块增加 Slimefun 方块信息完成。 耗时 &e{1} &a毫秒。"
     blockinforemove:
       start: "&a正在对 &e{0} &a~ &e{1} &a范围内的 Slimefun 方块移除 Slimefun 方块信息。"
-      success: "&a对 &e{0} &a个方块移除 Slimefun 方块信息完成。 耗时 &e{1} 毫秒。"
+      success: "&a对 &e{0} &a个方块移除 Slimefun 方块信息完成。 耗时 &e{1} &a毫秒。"
     blockmenuslotset:
       start: "&a正在对 &e{0} &a~ &e{1} &a范围内的 Slimefun 方块的方块菜单槽设置为你手中的物品。"
       success: "&a对 &e{0} &a个方块的方块菜单槽设置为你手中的物品完成。 耗时 &e{1} &a毫秒。"
@@ -149,7 +148,7 @@ messages:
       success: "&a已确认操作。"
     blockmenuslotfind:
       start: "&a正在查找 &e{0} &a~ &e{1} &a范围内的符合条件的方块菜单。"
-      success: "&a已找到 &e{0} &a个符合条件的方块菜单。"
+      success: "&a已找到 &e{0} &a个符合条件的方块菜单。 耗时 &e{1} &a毫秒。"
     savefile:
       start: "&a正在保存 &e{0} &a~ &e{1} &a范围内的方块..."
       success: "&a保存文件成功。"
@@ -158,6 +157,8 @@ messages:
       success: "&a加载文件成功。"
     move:
       success: "&a已移动投影。"
+    clearprojectile:
+      success: "&a已清除所有投影。"
   error:
     unknown-subcommand: "&c未知子指令 {0}。"
     unknown-location: "&c未知位置。"
@@ -181,6 +182,13 @@ messages:
     savefile-failed: "&c保存文件失败。"
     loadfile-not-found: "&c找不到文件。"
     loadfile-failed: "&c加载文件失败。"
+    file-not-found: "&c找不到文件。"
+    world-not-found: "&c文件中记录的世界不存在。"
+    deserialization-error: "&c文件中部分方块无法读取，已跳过。"
+  clipboard:
+    title: "SFWorldEdit 报告"
+    hover: "点击复制到剪贴板"
+  save-all: "正在保存所有数据..."
 icons:
   itemgroup_sfw_items:
     name: "&aSFWorldedit 物品"

@@ -59,7 +59,7 @@ public class ClearProjectileCommand extends SubCommand {
             }
         });
 
-        plugin.send(player, "commands.clearprojectile.success");
+        plugin.send(player, "command.clearprojectile.success");
 
         return true;
     }

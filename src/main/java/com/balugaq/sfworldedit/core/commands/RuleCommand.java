@@ -64,6 +64,11 @@ public class RuleCommand extends SubCommand {
             return false;
         }
 
+        if (intValue < 1) {
+            plugin.send(commandSender, "error.invalid-argument", value);
+            return false;
+        }
+
         plugin.getConfigManager().setConfig(ruleKey, intValue);
         plugin.send(commandSender, "command.rule.success", ruleName, intValue);
 

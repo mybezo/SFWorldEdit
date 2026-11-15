@@ -4,14 +4,14 @@ plugins {
 }
 
 group = "com.balugaq.sfworldedit"
-// version 由 gradle.properties 的 version= 提供，release.yml 也从那里读取。
+// The version comes from version= in gradle.properties; release.yml reads it from there too.
 
 repositories {
     mavenCentral()
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://jitpack.io")
     maven("https://hub.spigotmc.org/nexus/content/repositories/snapshots/")
-    // MetaLib / DisplayModelLib 的原仓库已整站下线，改由 lib/ 下的 JAR 提供。
+    // The original MetaLib / DisplayModelLib repository is offline; the JARs in lib/ are used instead.
     // maven("https://repo.metamechanists.org/releases/")
 }
 
@@ -30,14 +30,14 @@ dependencies {
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
 
-    // 原 Maven 的 compile 依赖，仓库 404 后由本地 JAR 提供，仍需随 shadow 打包
+    // Former Maven compile dependencies; their repository returns 404, so local JARs are shaded instead
     implementation(fileTree(mapOf("dir" to "lib", "include" to listOf("*.jar"))))
 }
 
 tasks {
     compileJava {
         options.encoding = "UTF-8"
-        // 本机可能跑 JDK 25/26、CI 跑 21，release 统一锁定 Java 21 字节码与 API。
+        // Local machines may run JDK 25/26 while CI runs 21; release pins Java 21 bytecode and API.
         options.release = 21
         options.compilerArgs.add("-Xlint:-removal")
     }

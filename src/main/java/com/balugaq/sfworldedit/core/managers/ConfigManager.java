@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 
 public class ConfigManager implements IManager {
     public static final long DEFAULT_MODIFICATION_BLOCK_LIMIT = 32768;
@@ -33,7 +34,7 @@ public class ConfigManager implements IManager {
             return;
         }
 
-        final Reader reader = new InputStreamReader(inputStream);
+        final Reader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
         final FileConfiguration resourceConfig = YamlConfiguration.loadConfiguration(reader);
         final FileConfiguration existingConfig = YamlConfiguration.loadConfiguration(existingFile);
 
@@ -70,15 +71,16 @@ public class ConfigManager implements IManager {
     }
 
     public long getModificationBlockLimit() {
-        return plugin.getConfig().getLong("worldedit.modification-block-limit", 32768);
+        return Math.max(1L, plugin.getConfig().getLong("worldedit.modification-block-limit", DEFAULT_MODIFICATION_BLOCK_LIMIT));
     }
 
     public int getModificationChunkPerSecond() {
-        return plugin.getConfig().getInt("worldedit.modification-chunk-limit-per-second", 16);
+        // A value below 1 would divide by zero / loop forever in WorldUtils.doWorldEdit.
+        return Math.max(1, plugin.getConfig().getInt("worldedit.modification-chunk-limit-per-second", 16));
     }
 
     public int getMaxBackups() {
-        return plugin.getConfig().getInt("worldedit.max-backups", 20);
+        return Math.max(1, plugin.getConfig().getInt("worldedit.max-backups", 20));
     }
 
     public boolean isAllowUndo() {
@@ -87,7 +89,7 @@ public class ConfigManager implements IManager {
 
     @Nullable
     public String getLanguage() {
-        return plugin.getConfig().getString("language", "zh-CN");
+        return plugin.getConfig().getString("language", "en-US");
     }
 
     public void saveAll() {

@@ -43,7 +43,7 @@ public class HelpCommand extends SubCommand {
         final String subCommand = args[0];
         final AtomicBoolean found = new AtomicBoolean(false);
         plugin.getCommandManager().iter(cmd -> {
-            if (cmd.getKey().equals(subCommand)) {
+            if (cmd.getKey().equalsIgnoreCase(subCommand)) {
                 plugin.sendList(commandSender, "messages.command.help.usage." + cmd.getKey());
                 found.set(true);
             }

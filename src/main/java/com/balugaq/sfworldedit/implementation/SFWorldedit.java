@@ -22,8 +22,8 @@ import javax.annotation.Nullable;
 import java.text.MessageFormat;
 
 /**
- * This is the main class of the JustEnoughGuide plugin.
- * It depends on the Slimefun4 plugin and provides a set of features to improve the game experience.
+ * Main class of the SFWorldEdit plugin.
+ * A Slimefun4 addon that brings WorldEdit-style region editing to Slimefun blocks.
  *
  * @author balugaq
  * @since 1.0
@@ -31,7 +31,7 @@ import java.text.MessageFormat;
 @SuppressWarnings("unused")
 @Getter
 public class SFWorldedit extends ISFWorldEdit implements Listener {
-    private static final String DEFAULT_LANGUAGE = "zh-CN";
+    private static final String DEFAULT_LANGUAGE = "en-US";
     private static final int RECOMMENDED_JAVA_VERSION = 17;
     private static final MinecraftVersion RECOMMENDED_MC_VERSION = MinecraftVersion.of(1, 16);
     @Nullable
@@ -68,7 +68,7 @@ public class SFWorldedit extends ISFWorldEdit implements Listener {
 
     @Nonnull
     public static SFWorldedit getInstance() {
-        Preconditions.checkArgument(instance != null, "SFWorldedit has not been enabled yet！");
+        Preconditions.checkArgument(instance != null, "SFWorldedit has not been enabled yet!");
         return SFWorldedit.instance;
     }
 
@@ -91,7 +91,7 @@ public class SFWorldedit extends ISFWorldEdit implements Listener {
 
     @Override
     public void onEnable() {
-        Preconditions.checkArgument(instance == null, "SFWorldEdit already has been enabled！");
+        Preconditions.checkArgument(instance == null, "SFWorldEdit already has been enabled!");
         instance = this;
 
         Debug.info("Loading Config Manager...");
@@ -105,8 +105,9 @@ public class SFWorldedit extends ISFWorldEdit implements Listener {
         String language = this.configManager.getLanguage();
         if (language == null) {
             Debug.warn("Language is not set!");
+        } else if (!language.equals(DEFAULT_LANGUAGE)) {
+            this.localizationService.addLanguage(language);
         }
-        this.localizationService.addLanguage(language);
 
         Debug.info("Loading Default Language \"" + DEFAULT_LANGUAGE + "\"...");
         this.localizationService.addLanguage(DEFAULT_LANGUAGE);
@@ -143,7 +144,7 @@ public class SFWorldedit extends ISFWorldEdit implements Listener {
 
     @Override
     public void onDisable() {
-        Preconditions.checkArgument(instance != null, "SFWorldedit has not been enabled yet！");
+        Preconditions.checkArgument(instance != null, "SFWorldedit has not been enabled yet!");
 
         SlimefunItemUtil.unregisterAllItems();
 
@@ -179,7 +180,7 @@ public class SFWorldedit extends ISFWorldEdit implements Listener {
             }
         } catch (NoClassDefFoundError | NullPointerException e) {
             Debug.warning(getString("messages.startup.auto-update-failed"));
-            e.printStackTrace();
+            Debug.trace(e);
         } catch (UnsupportedOperationException e) {
             Debug.warning(getString("messages.startup.unsupported-guizhanlib-version"));
             Debug.trace(e);
@@ -213,7 +214,7 @@ public class SFWorldedit extends ISFWorldEdit implements Listener {
         try {
             this.minecraftVersion = MinecraftVersion.current();
         } catch (RuntimeException e) {
-            // 版本串格式超出预期时降级为 UNKNOWN，让告警分支接管而不是让 onEnable 抛异常
+            // Fall back to UNKNOWN on an unexpected version string so the warning branch handles it instead of onEnable throwing.
             this.minecraftVersion = MinecraftVersion.UNKNOWN;
         }
         this.javaVersion = NumberUtils.getJavaVersion();

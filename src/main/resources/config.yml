@@ -1,16 +1,20 @@
-# Auto update from Guizhan Build is enabled by default.
+# Auto update via Guizhan Build. Only takes effect for builds whose version starts with "Build".
 auto-update: true
 
-# Language
-language: zh-CN
+# Language file in plugins/SFWorldEdit/lang/ (bundled: en-US, zh-CN)
+language: en-US
 
 worldedit:
+  # Maximum number of blocks a single operation may touch
   modification-block-limit: 32768
+  # Chunks processed per second (spreads large edits over time to avoid lag)
   modification-chunk-limit-per-second: 16
+  # Keep a per-player history so //sundo works (requires a restart to change)
   allow-undo: true
+  # Number of operations kept in each player's undo history
   max-backups: 20
 # Do not change this value unless you know what you are doing.
 config-version: 1
 
-# Do not change this value unless you know what you are doing.
+# Print debug messages to the console
 debug: false

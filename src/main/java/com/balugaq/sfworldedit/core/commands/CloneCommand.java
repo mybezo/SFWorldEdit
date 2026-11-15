@@ -61,6 +61,7 @@ public class CloneCommand extends SubCommand implements Preparable {
         final Location pos2 = plugin.getCommandManager().getPos2(player.getUniqueId());
 
         if (pos1 == null || pos2 == null) {
+            plugin.send(commandSender, "error.no-selection");
             return false;
         }
 
@@ -72,7 +73,7 @@ public class CloneCommand extends SubCommand implements Preparable {
         final long range = WorldUtils.getRange(pos1, pos2);
         final long max = plugin.getConfigManager().getModificationBlockLimit();
         if (range > max) {
-            plugin.send(commandSender, "error.too-many-blocks", range, max);
+            plugin.send(commandSender, "error.too-many-blocks", max, range);
             return false;
         }
 
@@ -213,15 +214,14 @@ public class CloneCommand extends SubCommand implements Preparable {
             return new ArrayList<>();
         }
 
-        if (args.length == 0) {
-            List<String> left = new ArrayList<>();
-            for (String flag : FLAGS) {
-                if (!CommandUtil.hasFlag(args, flag)) {
-                    left.add(flag);
-                }
+        // Bukkit always passes at least one (possibly empty) argument, so never test for length 0.
+        List<String> left = new ArrayList<>();
+        for (String flag : FLAGS) {
+            if (!CommandUtil.hasFlag(args, flag) && !CommandUtil.hasFlag(args, flag.substring(0, 1))) {
+                left.add("-" + flag);
             }
-            return left;
         }
-        return new ArrayList<>();
+        left.addAll(prepareArgs(args));
+        return left;
     }
 }

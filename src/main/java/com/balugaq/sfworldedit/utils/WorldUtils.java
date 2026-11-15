@@ -300,8 +300,8 @@ public class WorldUtils {
 
         Map<String, String> data = new HashMap<>();
         SlimefunBlockData blockData = StorageCacheUtils.getBlock(location);
-        StorageCacheUtils.requestLoad(blockData);
         if (blockData != null) {
+            StorageCacheUtils.requestLoad(blockData);
             try {
                 data = blockData.getAllData();
             } catch (IllegalStateException ignored) {

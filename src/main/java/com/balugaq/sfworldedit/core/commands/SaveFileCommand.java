@@ -5,6 +5,7 @@ import com.balugaq.sfworldedit.api.data.Content;
 import com.balugaq.sfworldedit.api.data.SFContent;
 import com.balugaq.sfworldedit.api.objects.SubCommand;
 import com.balugaq.sfworldedit.api.plugin.ISFWorldEdit;
+import com.balugaq.sfworldedit.utils.Debug;
 import com.balugaq.sfworldedit.utils.PermissionUtil;
 import com.balugaq.sfworldedit.utils.ReflectionUtil;
 import com.balugaq.sfworldedit.utils.WorldUtils;
@@ -150,7 +151,7 @@ public class SaveFileCommand extends SubCommand {
         final long range = WorldUtils.getRange(pos1, pos2);
         final long max = plugin.getConfigManager().getModificationBlockLimit();
         if (range > max) {
-            plugin.send(commandSender, "error.too-many-blocks", range, max);
+            plugin.send(commandSender, "error.too-many-blocks", max, range);
             return false;
         }
 
@@ -186,7 +187,7 @@ public class SaveFileCommand extends SubCommand {
                 coroot.set(key, data);
                 hashBackup.putAll(hashes);
             } catch (IOException e) {
-                e.printStackTrace();
+                Debug.trace(e);
             }
         }), () -> {
             config.set("hashBackup", hashBackup);
@@ -203,7 +204,7 @@ public class SaveFileCommand extends SubCommand {
                 config.save(file);
                 plugin.send(player, "command.savefile.success");
             } catch (IOException e) {
-                e.printStackTrace();
+                Debug.trace(e);
                 plugin.send(player, "error.savefile-failed");
             }
         });

@@ -92,13 +92,14 @@ public class Backup {
     }
 
     public void addContent(List<Content> content) {
-        if (backup.size() == pointer) {
-            backup.add(new ArrayList<>());
+        // A new action invalidates every entry after the pointer.
+        while (backup.size() > pointer) {
+            backup.remove(backup.size() - 1);
         }
 
+        backup.add(content);
+        pointer++;
         refresh();
-
-        backup.set(pointer++, content);
     }
 
     public void removeContent() {
@@ -135,12 +136,10 @@ public class Backup {
     }
 
     public void refresh() {
-        if (backup.size() > MAX_BACKUP_SIZE) {
+        // List.remove(0) already shifts the remaining entries left.
+        while (backup.size() > MAX_BACKUP_SIZE) {
             backup.remove(0);
-            for (int i = 0; i < pointer - 1; i++) {
-                backup.set(i, backup.get(i + 1));
-            }
-            pointer--;
+            pointer = Math.max(0, pointer - 1);
         }
     }
 }

@@ -4,6 +4,7 @@ import com.balugaq.sfworldedit.implementation.SFWorldedit;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.logging.Level;
 
 public class Debug {
     public static void info(String message) {
@@ -35,6 +36,6 @@ public class Debug {
     }
 
     public static void trace(@Nonnull Throwable e) {
-        e.printStackTrace();
+        SFWorldedit.getInstance().getLogger().log(Level.SEVERE, e.getMessage(), e);
     }
 }

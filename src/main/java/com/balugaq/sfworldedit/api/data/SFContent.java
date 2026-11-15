@@ -44,6 +44,9 @@ public class SFContent extends BukkitContent {
         }
         if (menu != null) {
             BlockMenu blockMenu = StorageCacheUtils.getMenu(getLocation());
+            if (blockMenu == null) {
+                return;
+            }
             for (Map.Entry<Integer, ItemStack> entry : menu.entrySet()) {
                 blockMenu.replaceExistingItem(entry.getKey(), entry.getValue());
             }

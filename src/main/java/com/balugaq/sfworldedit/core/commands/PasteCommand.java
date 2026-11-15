@@ -61,16 +61,17 @@ public class PasteCommand extends SubCommand implements Preparable {
         final boolean override = CommandUtil.hasFlag(args, "override") || CommandUtil.hasFlag(args, "o");
         final boolean force = CommandUtil.hasFlag(args, "force") || CommandUtil.hasFlag(args, "f");
         final boolean withoutblock = CommandUtil.hasFlag(args, "withoutblock") || CommandUtil.hasFlag(args, "w");
-        int length = args.length;
-        if (override) {
-            length--;
-        }
-        if (force) {
-            length--;
+        // The first argument that is not a flag (-o, -f, -w, -p, ...) is the Slimefun ID.
+        String positional = null;
+        for (String arg : args) {
+            if (!arg.startsWith("-")) {
+                positional = arg;
+                break;
+            }
         }
 
         final String sfid;
-        if (length < 1) {
+        if (positional == null) {
             ItemStack hand = player.getInventory().getItemInMainHand();
             SlimefunItem item = SlimefunItem.getByItem(hand);
             if (item == null) {
@@ -80,7 +81,7 @@ public class PasteCommand extends SubCommand implements Preparable {
                 sfid = item.getId();
             }
         } else {
-            sfid = args[0];
+            sfid = positional;
         }
         final SlimefunItem sfItem = SlimefunItem.getById(sfid);
 
@@ -100,7 +101,7 @@ public class PasteCommand extends SubCommand implements Preparable {
         final long range = WorldUtils.getRange(pos1, pos2);
         final long max = plugin.getConfigManager().getModificationBlockLimit();
         if (range > max) {
-            plugin.send(commandSender, "error.too-many-blocks", range, max);
+            plugin.send(commandSender, "error.too-many-blocks", max, range);
             return false;
         }
 
@@ -210,7 +211,7 @@ public class PasteCommand extends SubCommand implements Preparable {
             return new ArrayList<>();
         }
 
-        if (args.length == 1) {
+        if (args.length == 1 && !args[0].startsWith("-")) {
             return Slimefun.getRegistry().getAllSlimefunItems()
                     .stream()
                     .filter(item -> {

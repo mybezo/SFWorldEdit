@@ -1,143 +1,209 @@
 # SFWorldEdit
 
-一个粘液科技附属，功能与创世神类似，但是新增了编辑粘液方块的能力
+**English** | [简体中文](README.zh-CN.md)
 
-# 使用说明
+[![Build CI](https://github.com/balugaq/SFWorldEdit/actions/workflows/build.yml/badge.svg)](https://github.com/balugaq/SFWorldEdit/actions/workflows/build.yml)
+[![Compatibility](https://github.com/balugaq/SFWorldEdit/actions/workflows/test-compatibility.yml/badge.svg)](https://github.com/balugaq/SFWorldEdit/actions/workflows/test-compatibility.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> 你可以在粘液指南中找到`SFworldedit 物品组`  
-> 在里面可以找到对应工具  
-> 或者直接使用`/sf give <name> SFW_WORLDEDITOR`  
-> 工具选区方式与创世神原版无异
+A [Slimefun4](https://github.com/SlimefunGuguProject/Slimefun4) addon that works like WorldEdit, but understands **Slimefun blocks**: their block data, their inventories (BlockMenus) and whether they are ticking.
 
-| 全名 | 简写 | 参数 | 作用 |
-| --- | --- | --- | --- |
-| `/sfwhelp` | `//shelp` | `[子命令key]` | 显示命令列表 / 单条命令用法 |
-| `/sfwversion` | `//sversion` | — | 显示插件名与版本 |
-| `/sfwreload` | `//sreload` | — | 重载插件 |
-| `/sfwpos1` | `//spos1` | — | 以**脚下**方块设为选区点 1 |
-| `/sfwpos2` | `//spos2` | — | 以**脚下**方块设为选区点 2 |
-| `/sfwclearpos` | `//sclearpos` | — | 清除自己的选区 |
-| `/sfwpaste` | `//spaste` | `[sfid] [flags]` | 把指定 Slimefun 方块铺满选区 |
-| `/sfwclone` | `//sclone` | `[flags]` | 把选区克隆到**你当前所站位置** |
-| `/sfwclear` | `//sclear` | `[flags]` | 清空选区方块 |
-| `/sfwblockinfoadd` | `//sblockinfoadd` | `<key> <value>` | 批量写 Slimefun 方块数据 |
-| `/sfwblockinforemove` | `//sblockinforemove` | `<key>` | 批量删 Slimefun 方块数据 |
-| `/sfwblockmenuslotset` | `//sblockmenuslotset` | `<slot>` | 把主手物品写入选区所有 BlockMenu 的指定槽 |
-| `/sfwblockmenuslotfind` | `//sblockmenuslotfind` | `<slot>` | 统计该槽与主手物品相同的方块，导出不符坐标 |
-| `/sfwundo` | `//sundo` | — | 撤销上一次区域操作 |
-| `/sfwrule` | `//srule` | `<rule> <value>` | 修改两项性能规则并写入 config.yml |
-| `/sfwsavefile` | `//ssavefile` | — | 把选区存成 `clones/clone<时间戳>.yml` |
-| `/sfwloadfile` | `//sloadfile` | `<file_name> [-p]` | 读取存档并落到你当前位置 |
-| `/sfwmove` | `//smove` | `[距离\|cancel]` | 移动 / 取消投影预览 |
-| `/sfwclearprojectile` | `//sclearprojectile` | — | 清除投影实体并重置显示管理器 |
+Use it to fill a region with machines, clone a whole Slimefun factory, bulk-edit machine data such as stored energy, or save a build to a file and paste it elsewhere.
 
-# 参数详解
+## Features
 
-## `//spaste` - 批量放置
+- **Region selection** with a dedicated wand (`SFW_WORLDEDITOR`) or commands, with a particle outline.
+- **Paste**: fill the selection with any Slimefun block.
+- **Clone**: copy the selection, including Slimefun data, inventories and ticking state.
+- **Clear**: remove vanilla blocks, Slimefun data, or both, optionally running each machine's break handler.
+- **Bulk data editing**: add or remove Slimefun block data keys, set or audit a BlockMenu slot across the whole region.
+- **Save and load** selections as YAML files.
+- **Preview mode** (`-prepare` / `-p`): show the result as display entities before touching the world, and move the preview around.
+- **Undo** history per player.
+- **Throttled editing**: large edits are spread over several seconds, a set number of chunks at a time, to keep the server responsive.
+- Bundled translations: **English** (`en-US`) and **Simplified Chinese** (`zh-CN`).
 
-| 参数 | 行为 |
-| --- | --- | 
-| `<sfid>` | 要填充的sf机器id |
-| `-override/-o` | 覆盖目标位置已有的 Slimefun 方块数据 |
-| `-force/-f` | 跳过 `NotPlaceable` 检查（可能生成无法正常工作的机器） |
-| `-withoutblock/-w` | **只写入sf数据，不更改原版方块材质**
-| `-prepare/-p` | 仅投影预览 |
+## Requirements
 
-示例：把选区铺满某机器并强制覆盖：
+| | |
+| --- | --- |
+| Server | Paper or Spigot (`api-version: 1.20`). CI tests **1.20.1** and **26.2** |
+| Java | **17 or newer** at runtime (the plugin is compiled for Java 21) |
+| Required | [Slimefun4](https://github.com/SlimefunGuguProject/Slimefun4) |
+| Optional | [GuizhanLibPlugin](https://github.com/ybw0014/GuizhanLibPlugin), only needed for auto-update on `Build` versions |
+
+> [!NOTE]
+> Preview mode uses display entities, which need Minecraft **1.19.4 or newer**.
+
+## Installation
+
+1. Download the latest `SFWorldEdit-<version>.jar` from [Releases](https://github.com/balugaq/SFWorldEdit/releases).
+2. Put it in your server's `plugins/` folder, next to Slimefun.
+3. Restart the server.
+4. Optionally, set `language` in `plugins/SFWorldEdit/config.yml` and run `//sreload`.
+
+## Quick start
+
+```text
+/sf give <player> SFW_WORLDEDITOR   # get the wand (also listed in the Slimefun guide)
+```
+
+1. **Left-click** a block with the wand to set position 1, **right-click** to set position 2.
+   You can also stand on a block and run `//spos1` / `//spos2`.
+2. Run an operation, for example:
+
+   ```text
+   //spaste ELECTRIC_FURNACE -p    # preview the result first
+   //spaste ELECTRIC_FURNACE       # place it
+   //sundo                         # changed your mind
+   ```
+
+## Commands
+
+Every command has a full name (`/sfw<name>`) and a short alias (`//s<name>`).
+
+| Alias | Arguments | Description |
+| --- | --- | --- |
+| `//shelp` | `[subcommand]` | List all commands, or show the usage of one |
+| `//sversion` | | Show the plugin version |
+| `//sreload` | | Reload the plugin |
+| `//spos1` | | Set position 1 to the block you are standing on |
+| `//spos2` | | Set position 2 to the block you are standing on |
+| `//sclearpos` | | Clear your selection |
+| `//spaste` | `[sfid] [flags]` | Fill the selection with a Slimefun block (uses the item in your hand if `sfid` is omitted) |
+| `//sclone` | `[flags]` | Clone the selection to where you are standing |
+| `//sclear` | `[flags]` | Clear the blocks in the selection |
+| `//sblockinfoadd` | `<key> <value>` | Set a data key on every Slimefun block in the selection |
+| `//sblockinforemove` | `<key>` | Remove a data key from every Slimefun block in the selection |
+| `//sblockmenuslotset` | `<slot>` | Put the item in your main hand into this slot of every BlockMenu in the selection |
+| `//sblockmenuslotfind` | `<slot>` | Count BlockMenus whose slot matches the item in your hand and report the ones that do not |
+| `//ssavefile` | | Save the selection to a file |
+| `//sloadfile` | `<file_name> [-p]` | Load a saved file at your position |
+| `//smove` | `[distance\|cancel]` | Move the preview in the direction you are looking, or remove it |
+| `//sclearprojectile` | | Remove every preview entity |
+| `//sundo` | | Undo your last region operation (only if `allow-undo: true`) |
+| `//srule` | `<rule> <value>` | Change a limit and save it to `config.yml` |
+| `//sconfirm` | | Run a pending request that needs confirmation |
+
+### `//spaste` flags
+
+| Flag | Effect |
+| --- | --- |
+| `-override`, `-o` | Replace Slimefun data that already exists at the target |
+| `-force`, `-f` | Skip the `NotPlaceable` check (the machine may not work properly) |
+| `-withoutblock`, `-w` | Only write Slimefun data and keep the vanilla blocks |
+| `-prepare`, `-p` | Preview only |
 
 ```text
 //spaste <sfid> -o -f
 ```
 
-## `//sclear` - 清空选区
+### `//sclone` flags
+
+| Flag | Effect |
+| --- | --- |
+| `-override`, `-o` | Replace Slimefun blocks that already exist at the target |
+| `-prepare`, `-p` | Preview only |
+
+The selection is copied relative to position 1: position 1 lands on the block you are standing on.
+
+### `//sclear` flags
 
 ```text
 //sclear [-callhandler|-c] [-skipvanilla|-v] [-skipslimefun|-s]
 ```
 
-| 参数 | 行为 |
+| Flag | Effect |
 | --- | --- |
-| `-callhandler/-c` | 删除前调用该 Slimefun 方块的 `BlockBreakHandler.onPlayerBreak`（让机器自行掉落 / 清理能量等） |
-| `-skipvanilla/-v` | 只清理 sf 数据 |
-| `-skipslimefun/-s` | 保留 sf 数据，只清原版方块 |
+| `-callhandler`, `-c` | Call the block's `BlockBreakHandler.onPlayerBreak` first, so the machine can drop its items and clean up |
+| `-skipvanilla`, `-v` | Only remove Slimefun data and keep the vanilla blocks |
+| `-skipslimefun`, `-s` | Keep Slimefun blocks and only clear vanilla blocks |
 
-## 方块数据管理
+`-skipvanilla` and `-skipslimefun` cannot be combined.
+
+### Block data and BlockMenus
 
 ```text
-//sblockinfoadd <key> <value>     # 对选区内所有 SF 方块 setData(key, value)
+//sblockinfoadd <key> <value>     # setData(key, value) on every Slimefun block
 //sblockinforemove <key>          # removeData(key)
-//sblockmenuslotset <slot>        # 把主手物品写进所有 BlockMenu 的指定槽
-//sblockmenuslotfind <slot>       # 统计该槽与主手物品相同的方块
+//sblockmenuslotset <slot>        # put the item in your hand into this slot
+//sblockmenuslotfind <slot>       # count menus whose slot matches the item in your hand
 ```
 
-- `key` 的 Tab 补全来自你**准星 8 格内指向的方块**已有数据键，外加固定的 `energy-charge`。一般用于改动机器电量、进度等。
-- `<slot>` 范围 `0~53`。
-- `//sblockmenuslotfind` **不匹配**的坐标会生成 `failed-locations` YAML，通过一个「点击复制到剪贴板」的可点击消息发给你。适合排查「哪台机器的输入槽不对」。
+- Tab completion for `<key>` lists the data keys of the Slimefun block you are looking at (within 8 blocks), plus `energy-charge`. A common use is to change the stored energy or progress of many machines at once.
+- `<slot>` ranges from `0` to `53`.
+- `//sblockmenuslotfind` sends a clickable chat message that copies a YAML list of the **non-matching** locations to your clipboard. Handy for finding the one machine with the wrong item in its input slot.
 
-## 选区保存与加载
-
-> 类似投影
+### Saving and loading
 
 ```text
-//ssavefile                       # 无需参数，自动生成文件名
+//ssavefile
 //sloadfile <file_name> [-p]
 ```
 
-- 保存路径：`plugins/SFWorldEdit/clones/clone<System.currentTimeMillis()>.yml`。**文件名是时间戳**
-- `<file_name>` 不带 `.yml` 后缀，例：`//sloadfile clone1730000000000`。
-- `-p` 预览目前**只显示 `BukkitContent`**。
+- Files are saved as `plugins/SFWorldEdit/clones/clone<timestamp>.yml`.
+- Pass the file name without `.yml`, for example `//sloadfile clone1730000000000`. Only plain names are accepted (letters, digits, `.`, `_`, `-`).
+- The saved position 1 is placed at your feet.
+- Preview mode (`-p`) currently shows vanilla block data only.
 
-## 管理与配置
+### Rules
 
-```text
-//srule <rule> <value>            # 立即写入 config.yml
-//sreload                         # 重载插件
-//sconfirm                        # 执行待确认请求
-//sclearprojectile                # 清理投影实体
-```
+`//srule` changes a limit at runtime and writes it to `config.yml`. Values must be positive integers.
 
-
-# 环境要求
-
-| 项 | 要求 |
+| Rule | Config key |
 | --- | --- |
-| 服务端 | Paper / Spigot，`api-version: 1.20`；CI 在 **1.20.1** 与 **26.2** 上验证 |
-| Java | 源码最低 Java 16，运行时要求 **Java ≥ 17**；本项目按 Java 21 编译 |
-| 必需前置 | [Slimefun4](https://github.com/SlimefunGuguProject/Slimefun4) |
-| 可选前置 | GuizhanLibPlugin（自动更新；仅当版本号以 `Build` 开头时启用） |
+| `limitBlocks` | `worldedit.modification-block-limit` |
+| `limitChunkPerSecond` | `worldedit.modification-chunk-limit-per-second` |
 
-`MinecraftVersion` 采用 NetworksExpansion 的 record 实现，直接解析 `Bukkit.getMinecraftVersion()`，不枚举版本常量，因此 1.20.1 与 26.2 等新旧版本号都能正确识别。
+## Permissions
 
-# 配置
+All permissions default to `op`, except `sfworldedit.command.confirm`, which is granted to everyone.
 
-`config.yml` 默认值：
+| Permission | Grants |
+| --- | --- |
+| `sfworldedit.admin` | Every command |
+| `sfworldedit.command.admin` | Every command |
+| `sfworldedit.command.<name>` | One command, e.g. `sfworldedit.command.paste`, `sfworldedit.command.savefile` |
+
+The console can always run every command.
+
+## Configuration
+
+`plugins/SFWorldEdit/config.yml`:
 
 ```yaml
-auto-update: true
-language: zh-CN
+auto-update: true                       # Only used by "Build" versions
+language: en-US                         # en-US or zh-CN
 worldedit:
-  modification-block-limit: 32768
+  modification-block-limit: 32768       # Max blocks per operation
   modification-chunk-limit-per-second: 16
-  allow-undo: true
-  max-backups: 20
+  allow-undo: true                      # Restart required to change
+  max-backups: 20                       # Undo history size per player
 config-version: 1
 debug: false
 ```
 
-语言文件在 `lang/zh-CN.yml` 与 `lang/en-US.yml`；缺失键会在启动时自动补写回磁盘，但**不会覆盖**已有值。`debug: true` 时调试日志才会输出。
+Language files live in `plugins/SFWorldEdit/lang/`. Missing keys are added from the bundled defaults on startup, but your own edits are never overwritten. To add a language, copy `en-US.yml`, translate it, and set `language` to its file name.
 
-# 构建
+## Building from source
 
 ```bash
+git clone https://github.com/balugaq/SFWorldEdit.git
+cd SFWorldEdit
 ./gradlew clean build
 ```
 
-产物 `build/libs/SFWorldEdit-51.jar`（fat jar）。依赖统一声明在 `gradle/libs.versions.toml`。
+The shaded jar is written to `build/libs/SFWorldEdit-<version>.jar`. You need JDK 21 or newer. Dependencies are declared in `gradle/libs.versions.toml`.
 
-> MetaLib / DisplayModelLib 的原 Maven 仓库 `repo.metamechanists.org` 已下线，这两个库改由 `lib/*.jar` 提供并随 shadow 打包；仓库恢复后可改回坐标依赖。
+> [!NOTE]
+> The Maven repository of MetaLib and DisplayModelLib (`repo.metamechanists.org`) is offline, so both libraries are shipped in `lib/` and shaded into the jar. Do not delete them.
 
-CI 见 `.github/workflows/`：push 到 `main` 触发构建与兼容性测试；`gradle.properties` 里的版本号变更会自动创建 Release。
+CI (`.github/workflows/`) builds every push and pull request to `main` and starts a real Paper server for each version in the compatibility matrix. Changing `version=` in `gradle.properties` publishes a new release automatically.
 
-# 反馈与许可
+## Contributing
 
-问题反馈：[GitHub Issues](https://github.com/balugaq/SFWorldEdit/issues)。许可证见 [LICENSE](LICENSE)。
+Bug reports and suggestions are welcome in [Issues](https://github.com/balugaq/SFWorldEdit/issues). Pull requests should pass `./gradlew clean build`. Player-facing text goes in **both** `lang/en-US.yml` and `lang/zh-CN.yml`. See [AGENTS.md](AGENTS.md) for the project conventions.
+
+## License
+
+[MIT](LICENSE) © balugaq

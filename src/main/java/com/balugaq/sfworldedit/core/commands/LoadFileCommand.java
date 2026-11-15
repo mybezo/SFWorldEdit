@@ -7,8 +7,10 @@ import com.balugaq.sfworldedit.api.data.SFContent;
 import com.balugaq.sfworldedit.api.objects.SubCommand;
 import com.balugaq.sfworldedit.api.plugin.ISFWorldEdit;
 import com.balugaq.sfworldedit.implementation.SFWorldedit;
+import com.balugaq.sfworldedit.utils.Debug;
 import com.balugaq.sfworldedit.utils.PermissionUtil;
 import org.bukkit.Bukkit;
+import org.metamechanists.displaymodellib.sefilib.entity.display.DisplayGroup;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -29,6 +31,7 @@ import org.bukkit.util.io.BukkitObjectOutputStream;
 import org.yaml.snakeyaml.external.biz.base64Coder.Base64Coder;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -65,11 +68,13 @@ public class LoadFileCommand extends SubCommand implements Preparable {
                 Map<Integer, Integer> amountMap = getMapIntInt(c.getConfigurationSection("amountMap"));
                 for (Map.Entry<Integer, List<Integer>> entry : format.entrySet()) {
                     String base64Str = hashBackup.get(entry.getKey());
+                    if (base64Str == null) {
+                        continue;
+                    }
                     ItemStack itemStack = getObject(base64Str);
                     List<Integer> slots = entry.getValue();
                     for (int slot : slots) {
-                        container.put(slot, itemStack.clone());
-                        itemStack.setAmount(amountMap.get(slot));
+                        container.put(slot, withAmount(itemStack, amountMap.get(slot)));
                     }
                 }
             }
@@ -86,10 +91,12 @@ public class LoadFileCommand extends SubCommand implements Preparable {
             Map<Integer, Integer> amountMap = getMapIntInt(c.getConfigurationSection("amountMap"));
             for (Map.Entry<Integer, List<Integer>> entry : format.entrySet()) {
                 String base64Str = hashBackup.get(entry.getKey());
+                if (base64Str == null) {
+                    continue;
+                }
                 ItemStack itemStack = getObject(base64Str);
                 for (int slot : entry.getValue()) {
-                    menu.put(slot, itemStack.clone());
-                    itemStack.setAmount(amountMap.get(slot));
+                    menu.put(slot, withAmount(itemStack, amountMap.get(slot)));
                 }
             }
 
@@ -97,27 +104,43 @@ public class LoadFileCommand extends SubCommand implements Preparable {
             ticking = c.getBoolean("ticking");
         }
 
-        if (id != null) {
-            Block block = location.getBlock();
-            block.setType(material);
+        if (material == null || blockData == null) {
+            throw new IOException("Missing block data for content at " + location);
+        }
+
+        // A BlockState of the right type can only be obtained from a real block, so the block at the
+        // saved location is changed temporarily. Its original state (type, data and tile entity contents)
+        // is captured first and restored afterwards; the old code left Slimefun blocks permanently changed
+        // and wiped the contents of containers at the saved location.
+        Block block = location.getBlock();
+        BlockState original = block.getState();
+        try {
+            block.setType(material, false);
             BlockState state = block.getState();
             state.setBlockData(blockData);
-            return new SFContent(location, state, id, menu, data, ticking);
-        } else {
-            Block block = location.getBlock();
-            Material originType = block.getType();
-            block.setType(material);
-            BlockState state = block.getState();
-            state.setBlockData(blockData);
+            if (id != null) {
+                return new SFContent(location, state, id, menu, data, ticking);
+            }
+
             if (state instanceof Container statec) {
                 Inventory inventory = statec.getInventory();
                 for (Map.Entry<Integer, ItemStack> entry : container.entrySet()) {
                     inventory.setItem(entry.getKey(), entry.getValue());
                 }
             }
-            block.setType(originType);
             return new BukkitContent(location, state);
+        } finally {
+            original.update(true, false);
         }
+    }
+
+    @Nonnull
+    private static ItemStack withAmount(@Nonnull ItemStack template, @Nullable Integer amount) {
+        ItemStack clone = template.clone();
+        if (amount != null) {
+            clone.setAmount(amount);
+        }
+        return clone;
     }
 
     @Nonnull
@@ -139,7 +162,10 @@ public class LoadFileCommand extends SubCommand implements Preparable {
     }
 
     @Nonnull
-    public static Map<Integer, Integer> getMapIntInt(@Nonnull ConfigurationSection c) {
+    public static Map<Integer, Integer> getMapIntInt(@Nullable ConfigurationSection c) {
+        if (c == null) {
+            return new HashMap<>();
+        }
         Set<String> keys = c.getKeys(false);
         Map<Integer, Integer> map = new HashMap<>();
         for (String key : keys) {
@@ -149,7 +175,10 @@ public class LoadFileCommand extends SubCommand implements Preparable {
     }
 
     @Nonnull
-    public static Map<Integer, List<Integer>> getMapIntListInt(@Nonnull ConfigurationSection c) {
+    public static Map<Integer, List<Integer>> getMapIntListInt(@Nullable ConfigurationSection c) {
+        if (c == null) {
+            return new HashMap<>();
+        }
         Set<String> keys = c.getKeys(false);
         Map<Integer, List<Integer>> map = new HashMap<>();
         for (String key : keys) {
@@ -160,7 +189,10 @@ public class LoadFileCommand extends SubCommand implements Preparable {
     }
 
     @Nonnull
-    public static Map<Integer, String> getMapIntString(@Nonnull ConfigurationSection c) {
+    public static Map<Integer, String> getMapIntString(@Nullable ConfigurationSection c) {
+        if (c == null) {
+            return new HashMap<>();
+        }
         Set<String> keys = c.getKeys(false);
         Map<Integer, String> map = new HashMap<>();
         for (String key : keys) {
@@ -187,9 +219,18 @@ public class LoadFileCommand extends SubCommand implements Preparable {
             return false;
         }
         String fileName = args[0];
-        String filePath = plugin.getDataFolder() + "/clones/" + fileName + ".yml";
-        ConfigurationSection c = YamlConfiguration.loadConfiguration(new File(filePath));
-        if (c == null || c.getKeys(false).isEmpty()) {
+        // Only plain names are accepted, so the command cannot read files outside the clones folder.
+        if (!fileName.matches("[A-Za-z0-9_.-]+") || fileName.contains("..")) {
+            plugin.send(player, "error.invalid-argument", fileName);
+            return false;
+        }
+        File file = new File(new File(plugin.getDataFolder(), "clones"), fileName + ".yml");
+        if (!file.isFile()) {
+            plugin.send(player, "error.file-not-found");
+            return false;
+        }
+        ConfigurationSection c = YamlConfiguration.loadConfiguration(file);
+        if (c.getKeys(false).isEmpty()) {
             plugin.send(player, "error.file-not-found");
             return false;
         }
@@ -197,26 +238,27 @@ public class LoadFileCommand extends SubCommand implements Preparable {
         Map<Integer, String> hashBackup = getMapIntString(c.getConfigurationSection("hashBackup"));
         ConfigurationSection content = c.getConfigurationSection("content");
         String worldName = c.getString("world");
-        World world = Bukkit.getWorld(worldName);
-        if (world == null) {
+        World world = worldName == null ? null : Bukkit.getWorld(worldName);
+        if (world == null || content == null) {
             plugin.send(player, "error.world-not-found");
             return false;
         }
 
         Location originPos1 = new Location(
-                Bukkit.getWorld(c.getString("pos1.world")),
+                world,
                 c.getInt("pos1.x"),
                 c.getInt("pos1.y"),
                 c.getInt("pos1.z")
         );
 
         Location originPos2 = new Location(
-                Bukkit.getWorld(c.getString("pos2.world")),
+                world,
                 c.getInt("pos2.x"),
                 c.getInt("pos2.y"),
                 c.getInt("pos2.z")
         );
 
+        plugin.send(player, "command.loadfile.start");
         List<Content> contents = new ArrayList<>();
         for (String key : content.getKeys(false)) {
             String[] locArr = key.split("_");
@@ -228,8 +270,8 @@ public class LoadFileCommand extends SubCommand implements Preparable {
             try {
                 Content contentObj = deserializeContent(part, location, hashBackup);
                 contents.add(contentObj);
-            } catch (IOException | ClassNotFoundException e) {
-                e.printStackTrace();
+            } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
+                Debug.trace(e);
                 plugin.send(player, "error.deserialization-error");
             }
         }
@@ -258,9 +300,14 @@ public class LoadFileCommand extends SubCommand implements Preparable {
         }
 
         if (prepareMode) {
-            getDisplayGroup(uuid).getDisplays().forEach((name, display) -> {
-                display.setMetadata(SFWorldedit.getInstance().getName(), new FixedMetadataValue(SFWorldedit.getInstance(), true));
-            });
+            DisplayGroup group = getDisplayGroup(uuid);
+            if (group != null) {
+                group.getDisplays().forEach((name, display) -> {
+                    display.setMetadata(SFWorldedit.getInstance().getName(), new FixedMetadataValue(SFWorldedit.getInstance(), true));
+                });
+            }
+        } else {
+            plugin.send(player, "command.loadfile.success");
         }
 
         return true;

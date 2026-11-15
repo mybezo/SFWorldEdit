@@ -1,12 +1,12 @@
 * text=auto eol=lf
 
-# Windows 专属二进制
+# Binary files
 *.png binary
 *.ico binary
 *.icns binary
 *.exe binary
 *.dll binary
 
-# 换行敏感的脚本类型已由上面 * 规则统一为 LF
+# Everything else is normalized to LF by the * rule above; Windows scripts keep CRLF
 *.bat text eol=crlf
 *.cmd text eol=crlf

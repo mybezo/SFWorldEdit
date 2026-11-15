@@ -74,7 +74,7 @@ public interface Preparable {
     @Nonnull
     @CanIgnoreReturnValue
     default DisplayGroup display(UUID uuid, @Nonnull Location location, @Nonnull BlockData blockData) {
-        String ls = PREFIX + location.getBlockX() + "_" + location.getBlockY() + "_" + location.getBlockZ();
+        String ls = PREFIX + ":" + location.getBlockX() + "_" + location.getBlockY() + "_" + location.getBlockZ();
         Location displayLocation = location.clone().add(0.5, 0.5, 0.5);
         Display display;
         if (!isTile(blockData.getMaterial())) {
